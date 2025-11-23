@@ -30,7 +30,7 @@ class EvaluatorWithHistory:
         val = self.func(np.clip(x, self.lb, self.ub))
         self.calls += 1
         
-        # Log every 500 FEs
+        # Log the current error every 500 FEs (plus the first call)
         if self.calls % 500 == 0 or self.calls == 1:
             error = abs(val - self.optimal)
             if error == 0: error = 1e-15 

@@ -9,23 +9,23 @@
 
 ## 🚀 Overview
 
-This repository contains the implementation of **Hybrid IWOA**, an enhanced metaheuristic algorithm designed specifically for **rotated, ill-conditioned optimization landscapes** where standard algorithms tend to break down due to strong variable covariance.
+This repository contains the implementation of **Hybrid IWOA**, a variant of the Whale Optimization Algorithm (WOA) tailored for **rotated, ill-conditioned optimization problems** where standard approaches often degrade due to strong variable covariance.
 
-The standard Whale Optimization Algorithm (WOA) relies on largely coordinate-independent updates, which makes it effective on simple or separable functions but **ineffective on rotated, non-separable problems**. This implementation bridges that gap by integrating:
+The standard WOA relies on largely coordinate-independent updates, which makes it effective on simple or separable functions but less reliable on rotated, non-separable problems. Hybrid IWOA addresses this by combining three mechanisms:
 
 - **Boosted Nelder-Mead (BNM):** A covariance-guided local search operator for deep valley exploitation.
 - **Adaptive DE Crossover:** An adaptive recombination step that implicitly learns variable linkage during the mid-search phase.
-- **Dynamic Diversity Restoration:** A restart mechanism based on population variance to escape deceptive local basins and restore global exploration pressure.
+- **Dynamic Diversity Restoration:** A restart mechanism based on population variance to escape local basins and restore exploration pressure.
 
-Taken together, these components turn WOA into a **rotation-invariant specialist**, particularly suited for challenging real-world engineering and control problems where the search space is strongly coupled and ill-conditioned.
+In combination, these components make WOA more robust on rotated landscapes and other problems with strong variable coupling.
 
 ## 🏆 Key Results (IEEE CEC 2022 - 20 Dimensions)
 
-Hybrid IWOA was validated on the strict **IEEE CEC 2022** benchmark suite (20D, 200k FEs) and compared against the competition winner (**EA4eig**) and runner-up (**NL-SHADE-RSP**).
+Hybrid IWOA was evaluated on the **IEEE CEC 2022** benchmark suite (20D, 200k FEs) and compared against the competition winner (**EA4eig**) and runner-up (**NL-SHADE-RSP**).
 
 ### The "Discriminator" Test: F11
 
-Composition Function 3 (**F11**) is widely regarded as a discriminator for elite algorithms due to its **rotated valley structure**.
+Composition Function 3 (**F11**) has a pronounced rotated valley structure and is commonly used as a difficult test case.
 
 - **NL-SHADE-RSP (Runner-Up):** Failed (mean error: 150.0)  
 - **Hybrid IWOA (Ours):** Solved (mean error: 0.99)
@@ -39,7 +39,7 @@ Composition Function 3 (**F11**) is widely regarded as a discriminator for elite
 | F3 (Schaffer)   | Basic               | 0.00               | 1.00E-08     | ✅ Solved              |
 | F11 (Comp 3)    | Rotated / Complex   | **0.99**           | 150.0        | 🏆 State-of-the-Art    |
 
-> **Note:** Hybrid IWOA is designed as a **"rotation specialist"**. It deliberately trades some global exploration performance on simple separable grids (e.g., F4) in order to achieve **superior precision on complex rotated manifolds** (e.g., F11) that are closer to real-world engineering scenarios.
+> **Note:** Hybrid IWOA behaves as a **rotation-oriented variant**. It trades some performance on simple separable grids (e.g., F4) in order to achieve higher accuracy on complex rotated manifolds (e.g., F11), which are closer to many real-world engineering scenarios.
 
 ## 🛠️ Installation
 
@@ -64,7 +64,7 @@ To execute the full validation suite (12 functions, 30 independent runs per func
 python benchmarks/run_cec2022.py --dims 20 --runs 30
 ```
 
-This run uses parallel processing (`joblib`) and may take **30–40 minutes** depending on your CPU core count.
+This run uses parallel processing (`joblib`) and may take **30–40 minutes**, depending on your CPU core count.
 
 ### 2. Generate Convergence Plots
 

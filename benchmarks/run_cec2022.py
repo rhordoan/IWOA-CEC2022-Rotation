@@ -18,7 +18,7 @@ try:
     HAS_OPFUNU = True
 except ImportError:
     HAS_OPFUNU = False
-    print("Error: opfunu not installed. pip install opfunu tabulate")
+    print("opfunu (CEC 2022 functions) not found. Please run: pip install opfunu tabulate")
 
 def single_run_task(func_name, dims, run_id):
     import warnings
@@ -49,18 +49,19 @@ def single_run_task(func_name, dims, run_id):
     return error
 
 def run_cec2022_final_validation(dims=20, runs=30):
-    if not HAS_OPFUNU: return
+    if not HAS_OPFUNU:
+        return
 
     max_fes = 10000 * dims
     print(f"\n{'='*75}")
-    print(f"🚀 STRICT PAPER VALIDATION RUN - GOLD STANDARD (Dims={dims}, Runs={runs})")
+    print(f"CEC 2022 validation run (dims={dims}, runs={runs})")
     print(f"{'='*75}")
     
     final_stats = []
     
     for i in range(1, 13):
         func_name = f"F{i}2022"
-        print(f"Processing {func_name:<10} ...", end=" ", flush=True)
+        print(f"Running {func_name:<10} ...", end=" ", flush=True)
         
         start_t = time.time()
         
@@ -87,7 +88,7 @@ def run_cec2022_final_validation(dims=20, runs=30):
         })
 
     print("\n" + tabulate(pd.DataFrame(final_stats), headers="keys", tablefmt="latex", floatfmt=".2E"))
-    print("\n[INFO] Table formatted for LaTeX. Copy-paste into your paper.")
+    print("\nLaTeX-formatted table (float format .2E):")
 
 if __name__ == "__main__":
     import argparse

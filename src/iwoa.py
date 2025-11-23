@@ -97,7 +97,7 @@ class IWOA_Strict:
         mask = np.random.rand(self.dim) < 0.9
         return np.where(mask, mutant, x)
 
-    # --- Diversity-Only Restart (Gold Standard) ---
+    # --- Diversity-based restart ---
     def check_and_restart(self, pop, fits, progress):
         if progress > 0.90: return pop, fits, False 
         if self.eval.stop_flag: return pop, fits, False
