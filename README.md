@@ -58,23 +58,132 @@ pip install -r requirements.txt
 
 ### 1. Run the Full Benchmark
 
-To execute the full validation suite (12 functions, 30 independent runs per function) and generate LaTeX-ready tables:
+To execute the full validation suite (12 functions, 30 independent runs per function) and generate **CSV + LaTeX-ready tables**:
 
 ```bash
-python benchmarks/run_cec2022.py --dims 20 --runs 30
+python benchmarks/experiments.py --dims 20 --runs 30 --functions F1-12
 ```
 
 This run uses parallel processing (`joblib`) and may take **30–40 minutes**, depending on your CPU core count.
 
-### 2. Generate Convergence Plots
+#### Methods and ablations
 
-To visualize the log-scale convergence behavior on the critical functions (F1 and F11):
+The experiment runner supports:
+- Baseline: `woa`
+- Proposed: `iwoa` (expand into component ablations via `--iwoa_variants`)
+
+Example (baseline + full IWOA + ablations):
 
 ```bash
-python benchmarks/plot_convergence.py
+python benchmarks/experiments.py \
+  --dims 20 --runs 30 --functions F1-12 \
+  --methods iwoa,woa \
+  --iwoa_variants full,no_restart,no_crossover,no_chaos,no_levy,no_nelder_mead
 ```
 
-Convergence images will be saved under `results/plots/`.
+Outputs are written into a timestamped folder under `results/experiments/` and include:
+- `results.csv` / `results.jsonl` (per-run)
+- `summary.csv` / `summary.tex` (aggregated)
+- `meta.json` (config + environment metadata)
+
+### Ablation Study (solid: removal + addition + interactions)
+
+This repo includes **preset ablation suites** so you don’t accidentally omit variants:
+- `ablation_removal`: IWOA full + leave-one-out variants (+ WOA baseline)
+- `ablation_addition`: WOA → WOAPlus ladder (adds operators progressively) → IWOA(full) reference
+- `ablation_interactions`: factorial interactions for {restart, crossover, nelder_mead} (+ WOA baseline)
+
+#### Stage 1 (breadth): removal ablations on F1–F12 for 10D/20D/30D
+
+- PowerShell example:
+
+```powershell
+foreach ($d in 10,20,30) {
+  python benchmarks/experiments.py --preset ablation_removal --dims $d --runs 30 --functions F1-12
+}
+```
+
+- Bash example:
+
+```bash
+for d in 10 20 30; do
+  python benchmarks/experiments.py --preset ablation_removal --dims "$d" --runs 30 --functions F1-12
+done
+```
+
+#### Stage 2 (depth): addition ladder on hard functions (F7–F12) at 20D
+
+```bash
+python benchmarks/experiments.py --preset ablation_addition --dims 20 --runs 30 --functions F7-12
+```
+
+#### Stage 3 (synergy): interactions of {restart,crossover,nelder_mead} on F7–F12 at 20D
+
+```bash
+python benchmarks/experiments.py --preset ablation_interactions --dims 20 --runs 30 --functions F7-12
+```
+
+#### Post-processing: ablation contribution tables (Δ vs WOA / Δ vs full / success rates)
+
+Run this inside an experiment output folder (replace `<RUN_FOLDER>`):
+
+```bash
+python benchmarks/ablation_analysis.py --input_dir results/experiments/<RUN_FOLDER>
+```
+
+This creates:
+- `ablation_delta_vs_woa.csv/.tex`
+- `ablation_delta_vs_full.csv/.tex`
+- `success_rates.csv/.tex`
+- `ablation_plots/*.png` (heatmaps, default 20D)
+
+### 2. Statistical tables (ranks + Wilcoxon + Holm)
+
+After running experiments, compute ranking and statistical tests:
+
+```bash
+python benchmarks/stats.py --input results/experiments/<RUN_FOLDER>/summary.csv --baseline WOA
+```
+
+This writes `avg_ranks.*`, `ranks_per_function.*`, and `wilcoxon.*` into the same folder (CSV + LaTeX).
+
+### 2. Generate Convergence Plots
+
+To visualize **median + IQR** log-scale convergence behavior across multiple runs:
+
+```bash
+python benchmarks/plot_convergence.py \
+  --dims 20 --runs 30 --max_fes 200000 --log_every 500 \
+  --functions F1,F11 \
+  --methods iwoa,woa \
+  --iwoa_variants full
+```
+
+Convergence outputs are saved under `results/convergence/<RUN_FOLDER>/`:
+- `convergence.csv` (per-run curves)
+- `convergence_agg.csv` (median + quantiles)
+- `plots/*.png`
+
+### 3. Run unit tests (budget + reproducibility)
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+## 🐳 Docker (recommended for artifact reproduction)
+
+Build:
+
+```bash
+docker build -t iwoa-cec2022 .
+```
+
+Run experiments and write outputs to your local `results/` folder:
+
+```bash
+docker run --rm -v ${PWD}/results:/app/results iwoa-cec2022 \
+  python benchmarks/experiments.py --dims 20 --runs 30 --functions F1-12
+```
 
 ## 📂 Repository Structure
 
@@ -82,12 +191,23 @@ Convergence images will be saved under `results/plots/`.
 IWOA-CEC2022-Rotation/
 ├── src/
 │   ├── iwoa.py             # Core algorithm implementation (Gold Standard)
+│   ├── woa.py              # Baseline WOA (for comparisons)
+│   ├── woa_plus.py         # WOA + optional operators (for addition ablations)
 │   └── evaluator.py        # CEC-compliant evaluation wrapper
 ├── benchmarks/
-│   ├── run_cec2022.py      # Main validation harness
-│   └── plot_convergence.py # Plotting script
+│   ├── experiments.py      # Canonical deterministic experiment runner
+│   ├── reporting.py        # Output helpers (CSV/JSONL/LaTeX)
+│   ├── stats.py            # Ranks + Wilcoxon(+Holm) tables
+│   ├── ablation_presets.py # Preset method suites for ablation studies
+│   ├── ablation_analysis.py# Δ tables + success rates + heatmaps from an experiment folder
+│   ├── run_cec2022.py      # Backward-compatible wrapper (calls experiments.py)
+│   └── plot_convergence.py # Median+IQR convergence plots (multi-run)
+├── tests/
+│   ├── test_budget.py
+│   └── test_reproducibility.py
 ├── results/
 │   └── plots/              # Output directory for convergence figures
+├── Dockerfile
 ├── requirements.txt        # Python dependencies
 └── README.md               # Project documentation
 ```

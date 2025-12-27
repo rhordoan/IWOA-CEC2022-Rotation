@@ -1,0 +1,2 @@
+{"best_fit": 510.6605871168765, "dims": 2, "error": 210.6605871168765, "f_global": 300.0, "fes_used": 200, "function": "F12022", "max_fes": 200, "method": "IWOA_Strict", "run_id": 0, "seed": 12385, "wall_time_s": 0.003000020980834961}
+{"best_fit": 551.9195561672517, "dims": 2, "error": 251.9195561672517, "f_global": 300.0, "fes_used": 200, "function": "F12022", "max_fes": 200, "method": "IWOA_Strict", "run_id": 1, "seed": 13385, "wall_time_s": 0.0030002593994140625}

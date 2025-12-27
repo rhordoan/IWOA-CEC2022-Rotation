@@ -1,0 +1,2 @@
+method,function,dims,run_id,seed,max_fes,fes_used,best_fit,f_global,error,wall_time_s
+IWOA_Strict,F12022,2,0,12385,200,200,510.6605871168765,300.0,210.6605871168765,0.005000591278076172

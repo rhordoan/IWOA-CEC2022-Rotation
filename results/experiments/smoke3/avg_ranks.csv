@@ -1,0 +1,4 @@
+method,avg_rank
+WOA,1.0
+IWOA_Strict[full],2.0
+IWOA_Strict[no_restart],3.0

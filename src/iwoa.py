@@ -17,6 +17,14 @@ class IWOA_Strict:
         min_pop_size: int = 20,    
         spiral_shape_const: float = 1.0,
         archive_size: int = 10,
+        enable_restart: bool = True,
+        enable_crossover: bool = True,
+        enable_chaos: bool = True,
+        enable_levy: bool = True,
+        enable_nelder_mead: bool = True,
+        enable_init_chaos_opposition: bool = True,
+        enable_quasi_reflection: bool = True,
+        enable_lpsr: bool = True,
     ) -> None:
         self.eval = evaluator
         self.dim = dim
@@ -27,6 +35,14 @@ class IWOA_Strict:
         self.min_pop_size = min_pop_size
         self.spiral_shape_const = spiral_shape_const
         self.archive_size = archive_size
+        self.enable_restart = bool(enable_restart)
+        self.enable_crossover = bool(enable_crossover)
+        self.enable_chaos = bool(enable_chaos)
+        self.enable_levy = bool(enable_levy)
+        self.enable_nelder_mead = bool(enable_nelder_mead)
+        self.enable_init_chaos_opposition = bool(enable_init_chaos_opposition)
+        self.enable_quasi_reflection = bool(enable_quasi_reflection)
+        self.enable_lpsr = bool(enable_lpsr)
 
     # --- Initialization ---
     def gauss_map(self, x):
@@ -38,6 +54,11 @@ class IWOA_Strict:
 
     def _initial_candidates(self, size=None) -> Tuple[np.ndarray, np.ndarray]:
         n = size if size is not None else self.pop_size
+        if not self.enable_init_chaos_opposition:
+            X = np.random.rand(n, self.dim)
+            X = X * (self.ub - self.lb) + self.lb
+            return X, self.lb + self.ub - X
+
         half = n // 2
         if n < 2: half = 0
         
@@ -59,7 +80,11 @@ class IWOA_Strict:
     def initialize_population(self):
         X, X_opp = self._initial_candidates()
         f_X = np.array([self.eval(x) for x in X])
-        
+
+        # Opposition-based selection is part of the init component.
+        if not self.enable_init_chaos_opposition:
+            return X, f_X
+
         f_Xopp = []
         for x in X_opp:
             if self.eval.calls < self.eval.max_fes:
@@ -67,7 +92,7 @@ class IWOA_Strict:
             else:
                 f_Xopp.append(1e15)
         f_Xopp = np.array(f_Xopp)
-        
+
         take_opp = f_Xopp < f_X
         pop = np.where(take_opp[:, None], X_opp, X)
         fits = np.where(take_opp, f_Xopp, f_X)
@@ -145,21 +170,23 @@ class IWOA_Strict:
             progress = self.eval.calls / self.eval.max_fes
             
             # 1. LPSR
-            plan_pop = int(np.round((self.min_pop_size - self.initial_pop_size) * progress + self.initial_pop_size))
-            if self.pop_size > plan_pop:
-                sorted_idx = np.argsort(fits)
-                pop = pop[sorted_idx[:plan_pop]]
-                fits = fits[sorted_idx[:plan_pop]]
-                self.pop_size = plan_pop
+            if self.enable_lpsr:
+                plan_pop = int(np.round((self.min_pop_size - self.initial_pop_size) * progress + self.initial_pop_size))
+                if self.pop_size > plan_pop:
+                    sorted_idx = np.argsort(fits)
+                    pop = pop[sorted_idx[:plan_pop]]
+                    fits = fits[sorted_idx[:plan_pop]]
+                    self.pop_size = plan_pop
 
             # 2. Check Restart
-            pop, fits, restarted = self.check_and_restart(pop, fits, progress)
-            if restarted:
-                idx_best = int(np.argmin(fits))
-                if fits[idx_best] < global_best_fit:
-                    global_best, global_best_fit = pop[idx_best].copy(), float(fits[idx_best])
-                stagnation_counter = 0
-                continue
+            if self.enable_restart:
+                pop, fits, restarted = self.check_and_restart(pop, fits, progress)
+                if restarted:
+                    idx_best = int(np.argmin(fits))
+                    if fits[idx_best] < global_best_fit:
+                        global_best, global_best_fit = pop[idx_best].copy(), float(fits[idx_best])
+                    stagnation_counter = 0
+                    continue
 
             # Parameters
             a = 2.0 * (1.0 - progress**1.5) 
@@ -193,35 +220,40 @@ class IWOA_Strict:
                     l = random.uniform(-1, 1)
                     x_new = D * math.exp(spiral_c * l) * math.cos(2*math.pi*l) + global_best
 
-                if stagnation_counter > 10:
+                if self.enable_levy and stagnation_counter > 10:
                     if random.random() < 0.5:
                         x_new += self.levy_flight() * (x_new - global_best) * 0.5
                     else:
                         x_new += np.random.normal(0, 1.0, self.dim) * (self.ub-self.lb) * 0.01
 
-                if random.random() < crossover_prob:
+                if self.enable_crossover and random.random() < crossover_prob:
                     x_new = self.apply_crossover(x, pop, i)
 
                 x_new = np.clip(x_new, self.lb, self.ub)
                 xs.append(x_new)
-                x_qr = self.get_quasi_reflection(x_new, curr_min, curr_max)
-                x_opps.append(np.clip(x_qr, self.lb, self.ub))
+                if self.enable_quasi_reflection:
+                    x_qr = self.get_quasi_reflection(x_new, curr_min, curr_max)
+                    x_opps.append(np.clip(x_qr, self.lb, self.ub))
 
             # --- Batch Evaluation ---
             fits_x, fits_opp = [], []
             for cand in xs:
                 if self.eval.stop_flag: break
                 fits_x.append(self.eval(cand))
-            for cand in x_opps:
-                if self.eval.stop_flag: break
-                fits_opp.append(self.eval(cand))
+            if self.enable_quasi_reflection:
+                for cand in x_opps:
+                    if self.eval.stop_flag: break
+                    fits_opp.append(self.eval(cand))
             if self.eval.stop_flag: break
 
             # Selection
             updated_any = False
             for i in range(len(fits_x)):
-                if fits_opp[i] < fits_x[i]:
-                    cand_x, cand_fit = x_opps[i], fits_opp[i]
+                if self.enable_quasi_reflection:
+                    if fits_opp[i] < fits_x[i]:
+                        cand_x, cand_fit = x_opps[i], fits_opp[i]
+                    else:
+                        cand_x, cand_fit = xs[i], fits_x[i]
                 else:
                     cand_x, cand_fit = xs[i], fits_x[i]
                 
@@ -238,7 +270,7 @@ class IWOA_Strict:
             if not updated_any: stagnation_counter += 1
 
             # --- Chaotic Local Search ---
-            if progress > 0.9 and not updated_any and not self.eval.stop_flag:
+            if self.enable_chaos and progress > 0.9 and not updated_any and not self.eval.stop_flag:
                 chaos_val = np.random.rand(self.dim)
                 for _ in range(5): chaos_val = 4.0 * chaos_val * (1 - chaos_val)
                 epsilon = 1e-3 * (1 - progress)
@@ -255,7 +287,7 @@ class IWOA_Strict:
             is_stuck = (stagnation_counter > 15 and stagnation_counter % 5 == 0)
             is_final = (progress > 0.95 and gen % 10 == 0)
             
-            if (is_stuck or is_final) and len(archive) > 0 and not self.eval.stop_flag:
+            if self.enable_nelder_mead and (is_stuck or is_final) and len(archive) > 0 and not self.eval.stop_flag:
                 rem_budget = self.eval.max_fes - self.eval.calls
                 nm_budget = min(500, rem_budget) 
                 
