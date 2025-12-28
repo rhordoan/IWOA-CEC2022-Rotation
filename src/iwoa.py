@@ -1,7 +1,7 @@
 import math
 import random
 import numpy as np
-from typing import Tuple
+from typing import Callable, Optional, Tuple
 from scipy.optimize import minimize
 from scipy.stats import skewnorm
 from src.evaluator import CEC_Evaluator
@@ -80,7 +80,7 @@ class IWOA_Strict:
     def initialize_population(self):
         X, X_opp = self._initial_candidates()
         f_X = np.array([self.eval(x) for x in X])
-
+        
         # Opposition-based selection is part of the init component.
         if not self.enable_init_chaos_opposition:
             return X, f_X
@@ -92,7 +92,7 @@ class IWOA_Strict:
             else:
                 f_Xopp.append(1e15)
         f_Xopp = np.array(f_Xopp)
-
+        
         take_opp = f_Xopp < f_X
         pop = np.where(take_opp[:, None], X_opp, X)
         fits = np.where(take_opp, f_Xopp, f_X)
@@ -152,9 +152,20 @@ class IWOA_Strict:
         
         return pop, fits, False
 
+    def _avg_diversity(self, pop: np.ndarray) -> float:
+        """
+        Scalar diversity proxy used by the restart trigger:
+        mean over dimensions of the population standard deviation.
+        """
+        if pop is None or pop.size == 0:
+            return 0.0
+        return float(np.mean(np.std(pop, axis=0)))
+
     # --- Main Run ---
-    def run(self) -> Tuple[np.ndarray, float]:
+    def run(self, trace_hook: Optional[Callable[[int, float, bool], None]] = None) -> Tuple[np.ndarray, float]:
         pop, fits = self.initialize_population()
+        if trace_hook is not None:
+            trace_hook(int(self.eval.calls), self._avg_diversity(pop), False)
         
         idx_best = int(np.argmin(fits))
         global_best, global_best_fit = pop[idx_best].copy(), float(fits[idx_best])
@@ -171,7 +182,9 @@ class IWOA_Strict:
             
             # 1. LPSR
             if self.enable_lpsr:
-                plan_pop = int(np.round((self.min_pop_size - self.initial_pop_size) * progress + self.initial_pop_size))
+                plan_pop = int(
+                    np.round((self.min_pop_size - self.initial_pop_size) * progress + self.initial_pop_size)
+                )
                 if self.pop_size > plan_pop:
                     sorted_idx = np.argsort(fits)
                     pop = pop[sorted_idx[:plan_pop]]
@@ -181,6 +194,8 @@ class IWOA_Strict:
             # 2. Check Restart
             if self.enable_restart:
                 pop, fits, restarted = self.check_and_restart(pop, fits, progress)
+                if trace_hook is not None:
+                    trace_hook(int(self.eval.calls), self._avg_diversity(pop), bool(restarted))
                 if restarted:
                     idx_best = int(np.argmin(fits))
                     if fits[idx_best] < global_best_fit:
@@ -305,5 +320,8 @@ class IWOA_Strict:
                         pop[np.argmin(fits)] = global_best
                         fits[np.argmin(fits)] = global_best_fit
                         stagnation_counter = 0
+
+            if trace_hook is not None:
+                trace_hook(int(self.eval.calls), self._avg_diversity(pop), False)
 
         return global_best, global_best_fit
