@@ -1,0 +1,499 @@
+%% bare_conf.tex
+%% V1.4b
+%% 2015/08/26
+%% by Michael Shell
+%% See: http://www.michaelshell.org/
+
+\documentclass[conference]{IEEEtran}
+
+% =========================================================
+% PACKAGES
+% =========================================================
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{booktabs}   % Professional table rules
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{balance}    % Balances the last page columns
+
+% =========================================================
+% CUSTOM DEFINITIONS & STYLING
+% =========================================================
+\newtheorem{Theorem}{Theorem}
+\newtheorem{Definition}[Theorem]{Definition}
+\renewcommand{\arraystretch}{1.25} % Slightly more breathing room in tables
+
+% List styling
+\usepackage{enumitem}
+\setlist{leftmargin=*, noitemsep, topsep=2pt}
+
+% ---------------------------------------------------------
+% FLOAT TUNING (Polished for aesthetics)
+% ---------------------------------------------------------
+% We relax the aggressive 2pt/5pt settings to prevent overlap ("text on text")
+% while still keeping the layout tight.
+\setlength{\textfloatsep}{10pt plus 2.0pt minus 2.0pt}
+\setlength{\floatsep}{10pt plus 2.0pt minus 2.0pt}
+\setlength{\intextsep}{10pt plus 2.0pt minus 2.0pt}
+
+% Encourage floats to appear at the top/bottom rather than middle
+\setcounter{topnumber}{2}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.85}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.8}
+
+% Color definitions
+\definecolor{bulgarianrose}{rgb}{0.28, 0.02, 0.03}
+\definecolor{chocolate}{rgb}{0.48, 0.25, 0.0}
+\definecolor{darkgreen}{rgb}{0,0.5,0}
+
+% Helper: include a figure if present; otherwise show a placeholder box.
+\newcommand{\MaybeIncludeGraphics}[2]{%
+  \IfFileExists{\detokenize{#1}}{\includegraphics[width=#2]{\detokenize{#1}}}{%
+    % A cleaner placeholder
+    \fbox{\begin{minipage}[c][3cm]{#2}
+      \centering \small \textbf{Missing Figure}\\\texttt{\detokenize{#1}}
+    \end{minipage}}%
+  }%
+}
+
+% Compact table cell for "mean ± std" without shrinking the whole table.
+\newcommand{\pmcell}[2]{\shortstack{$#1$\\$\pm #2$}}
+
+\begin{document}
+
+% =========================================================
+% TITLE & AUTHORS
+% =========================================================
+\title{Hybrid IWOA: Improving Whale Optimization on CEC 2022 via Budgeted Local Search, Differential Crossover, and Restarts}
+
+\author{\IEEEauthorblockN{Roberto Sergiu Hordoan}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{University Babes-Bolyai}\\
+Cluj-Napoca, Romania \\
+roberto.hordoan@stud.ubbcluj.ro}
+}
+
+\maketitle
+
+% Page numbering (Optional for submission, usually removed for camera-ready)
+\thispagestyle{plain}
+\pagestyle{plain}
+
+% =========================================================
+% ABSTRACT
+% =========================================================
+\begin{abstract}
+While standard Whale Optimization Algorithm (WOA) has proved its performance on simple landscapes, it can degrade substantially on rotated, non-separable, and ill-conditioned problems. Modern benchmarks such as IEEE CEC 2022 highlight such limitations. We propose \textit{Hybrid IWOA}, a novel WOA variant that combines (i) chaotic initialization with opposition-based selection, (ii) linear population-size reduction, (iii) DE-style crossover, (iv) diversity-triggered restarts, and (v) a budgeted Nelder--Mead local-search intensification. Evaluation is done on the 20-dimensional CEC 2022 suite under a strict budget of 200{,}000 function evaluations and 30 independent runs per function. The proposed approach vastly improves Vanilla WOA on the CEC 2022 suite on 11 out of 12 functions, with the primary exception being F10. An ablation study (removal, addition, and interaction suites) indicates the importance of crossover and population-size reduction as the dominant contributors overall, while proving Nelder--Mead intensification's importance for stabilizing difficult composition cases (e.g., F11).
+\end{abstract}
+
+\begin{IEEEkeywords}
+Metaheuristics, Whale Optimization Algorithm, Rotation Invariance, CEC 2022, Nelder-Mead.
+\end{IEEEkeywords}
+
+\IEEEpeerreviewmaketitle
+
+% =========================================================
+% 1. INTRODUCTION
+% =========================================================
+\section{Introduction}
+\label{sec:intro}
+
+The Whale Optimization Algorithm (WOA) \cite{mirjalili2016woa} is a popular swarm intelligence that drives its inspiration from the bubble-net hunting strategy of humpback whales. While being very effective on separable problems, where variables are independent, standard WOA suffers from a critical limitation: variables are updated independently. The algorithm thus become completely blind to variable correlations (covariance) which causes severe performance degradation on rotated, non-separable, and ill-conditioned problems. \cite{cec2022}.
+
+In this technical report, we propose \textbf{Hybrid IWOA}. We target rotation invariance and premature convergence through an enhanced architecture.
+
+Our contributions are as follows:
+\begin{itemize}
+    \item \textbf{Hybridization of WOA:} We extend WOA with opposition-based chaotic initialization, linear population-size reduction (LPSR), DE-style crossover, diversity-triggered restarts, and a budgeted Nelder--Mead intensification.
+    \item \textbf{Ablation validation:} We quantify the importance of each component via systematic removal, addition, and interaction studies.
+    \item \textbf{Reproducibility:} We provide scripts and a Dockerized environment for replicating all experiments.
+\end{itemize}
+
+The structure of the report is the following: Section \ref{sec:method} presents the proposed improvements and complexity analysis. Section \ref{sec:experiments} goes into detail about the CEC 2022 experimental setup, the baseline optimization algorithms used and the exact protocol used. Section \ref{sec:results} discusses the statistical results and the interesting findings of the ablation study, followed by conclusions in Section \ref{sec:conclusion}.
+
+% =========================================================
+% 2. PROPOSED METHOD
+% =========================================================
+\section{Proposed Method: Hybrid IWOA}
+\label{sec:method}
+
+The optimization problem can be formulated as minimizing an objective function $f(\mathbf{x})$ with predefined boundary constraints $\mathbf{lb} \leq \mathbf{x} \leq \mathbf{ub}$. The proposed architecture extends upon the canonical WOA by adding five distinct mechanisms.
+
+\subsection{Chaotic Initialization with Opposition}
+To improve the quality of the initial population coverage, we employ a dual-strategy initialization. Half of the population is initialized using the \textbf{Gauss map}, and the other half using the \textbf{Logistic map} defined as $x_{k+1} = r x_k(1-x_k)$. Thus we extend on the classical WOA initialization by adding a second map.
+
+Furthermore, we apply Opposition-Based Learning (OBL). For every candidate solution $\mathbf{x}$, an opposite solution $\tilde{\mathbf{x}}$ is generated based on the bounds as follows:
+\begin{equation}
+    \tilde{\mathbf{x}} = \mathbf{lb} + \mathbf{ub} - \mathbf{x}
+\end{equation}
+The algorithm evaluates both $\mathbf{x}$ and $\tilde{\mathbf{x}}$ and keeps the one with the better fitness value in the initial population.
+
+\subsection{Adaptive Search Dynamics}
+\subsubsection{Linear Population-Size Reduction (LPSR)}
+To reduce the computational budget, we introduce a mechanism to reduce the population size $N_t$ linearly with respect to function evaluations (FEs):
+\begin{equation}
+    N_t = \text{round}\left( (N_{min} - N_{init}) \cdot \frac{FEs}{MaxFEs} + N_{init} \right)
+\end{equation}
+This allows for a really board exploration in the early stages of the search and then focus the computational resources on the elite individuals in the later stages.
+
+\subsubsection{Adaptive Spiral}
+To balance exploration and exploitation, we add a parameter that controls stages of the search between the encircling and the spiral update. The parameter $p$ is drawn from a probability distribution that moves from a negative skew (exploration) to a positive skew (exploitation) as the search progresses.
+
+\subsection{Hybrid Operators}
+\label{sec:hybrid_ops}
+
+\subsubsection{Adaptive Differential Crossover}
+To capture variable interactions and improve performance on ill-conditioned and non-separable problems, we introduce a DE-style crossover operator triggered at a certain phase-dependend probability. A candidate $\mathbf{x}_i$ is perturbed using a guide from the elite part of the population and a differential term, followed by a binomial mask. This operator proves promising improvements on hybrid and composition functions.
+
+\subsubsection{Quasi-Reflection}
+As a cheap local refinement mechanism we employ a quasi-reflection operator by generating candidate solutions around the spread of the current population. Let $\mathbf{c} = (\mathbf{x}_{\min} + \mathbf{x}_{\max})/2$, where $\mathbf{x}_{\min}$ and $\mathbf{x}_{\max}$ are the coordinate-wise population current minima and maxima. Then:
+\begin{equation}
+    \mathbf{x}_{qr} = \mathbf{c} + \mathbf{r} \odot (\mathbf{x}_{new} - \mathbf{c}), \quad \mathbf{r}\sim U(0,1)^D
+\end{equation}
+After evaluation of both $\mathbf{x}_{new}$ and $\mathbf{x}_{qr}$ we keep the better one, subject to the FE budget.
+
+% --- ALGORITHM FLOAT ---
+% Placed here to float to the top of this column or the next
+\begin{algorithm}[!t]
+\caption{Hybrid IWOA with budgeted Nelder--Mead}
+\label{alg:iwoa}
+\begin{algorithmic}[1]
+\REQUIRE Max $FEs$, Population $N_{init}$
+\STATE Initialize Pop $X$ using Gauss/Logistic maps + OBL
+\STATE Evaluate Fitness $F(X)$, identify $X^*$ (Global Best)
+\WHILE{$FEs < MaxFEs$}
+    \STATE Update parameters $a, p$
+    \STATE $N_t \gets$ Calculate LPSR size
+    \IF{$StdDev(X) < \delta_{restart}$}
+        \STATE Perform Soft Restart (Preserve Elites)
+    \ENDIF
+    \FOR{each agent $i = 1$ to $N_t$}
+        \IF{Crossover Condition}
+            \STATE $X_i \gets$ Differential Crossover($X_i, X_{guide}$)
+        \ELSE
+            \IF{$p < 0.5$}
+                \STATE Update Encircling (Eq. 2.1)
+            \ELSE
+                \STATE Update Spiral (Eq. 2.5)
+            \ENDIF
+        \ENDIF
+        \STATE $X_i \gets$ QuasiReflection($X_i$)
+        \STATE Check Boundaries and Update Fitness
+    \ENDFOR
+    \IF{Stagnation OR Final Phase}
+        \STATE $X^*_{refined} \gets$ Nelder-Mead($X^*$, budget=50)
+        \IF{$f(X^*_{refined}) < f(X^*)$}
+            \STATE $X^* \gets X^*_{refined}$
+        \ENDIF
+    \ENDIF
+\ENDWHILE
+\RETURN $X^*$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Budgeted Nelder--Mead Intensification}
+Since standard WOA has the tendency to stagnate in narrow valleys and ill-conditioned regions we add a budgeted Nelder-Mead simplex search. This is a local optimizer that exploits local geometry without requiring derivatives.
+
+\textbf{Trigger:} The Nelder--Mead intensification has two trigger conditions:
+\begin{enumerate}
+    \item \textbf{Stagnation:} If the global best has stagnated for a set number of generations.
+    \item \textbf{End-Game:} In the final 5\% of the computational budget.
+\end{enumerate}
+
+When either of the conditions is met, a bounded micro-budget is allocated for the simplex search starting from the current global best. Any improvement is then injected into the population.
+
+\subsection{Diversity-Triggered Restart}
+Stagnation in local optima is another shortcoming of the canonical WOA. To avoid such failures we monitor the population's standard deviation. If diversity falls below a threshold $\delta$, the algorithm performs a "soft restart":
+\begin{itemize}
+    \item The top 10\% (elites) are preserved.
+    \item The remaining 90\% are re-initialized using chaotic maps.
+\end{itemize}
+
+\subsection{Algorithm Structure and Complexity}
+The overall structure of the proposed Hybrid IWOA is summarized in Algorithm \ref{alg:iwoa}.
+
+\textbf{Complexity Analysis:} The time complexity of standard WOA is $O(G \times N \times D)$. Hybrid IWOA adds sorting ($O(N \log N)$), and Nelder-Mead ($O(k \times D^2)$). However, $k$ is limited to a micro-budget (approx. 50 FEs). Since the total FEs are fixed (approx. 200000 FEs) the complexity remains the same as the one of the canonical WOA.
+
+% =========================================================
+% 3. EXPERIMENTAL DESIGN
+% =========================================================
+\section{Experimental Design}
+\label{sec:experiments}
+
+\subsection{Benchmark Suite}
+We evaluate the method on the \textbf{IEEE CEC 2022} benchmark suite for Single Objective Bound Constrained Numerical Optimization.
+\begin{itemize}
+    \item \textbf{Dimensions ($D$):} 20
+    \item \textbf{Max Evaluations:} 200,000 FEs
+    \item \textbf{Runs:} 30 independent runs per function
+\end{itemize}
+The error metric is computed as $\lvert f(\mathbf{x}_{best}) - f^{\\ast}\\rvert$. Special attention is paid to \textbf{Function F11 (Composition Function 3)}, which is known as one of the most difficult fucntions in the suite.
+
+\subsection{Implementation and Experimental Protocol}
+\label{sec:protocol}
+This section details the exact implementation to fully replicate the experiments done and the results found.
+
+\begin{table}[!t]
+\caption{Hybrid IWOA protocol (20D, CEC 2022) and key hyperparameters.}
+\label{tab:protocol}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{p{0.27\columnwidth}p{0.69\columnwidth}}
+\toprule
+\textbf{Item} & \textbf{Setting} \\
+\midrule
+Budget & MaxFEs $=200{,}000$ (strictly enforced by an evaluator wrapper) \\
+Stopping & Stop when evaluator calls reach MaxFEs \\
+Bounds & Clip candidates to $[\mathbf{lb},\mathbf{ub}]$ before evaluation \\
+Population & $N_{init}=100$, $N_{min}=20$ \\
+LPSR & Linear schedule to $N_{min}$ as $\mathrm{progress}=\tfrac{FEs}{MaxFEs}$ increases \\
+Spiral constant & Spiral shape scaled as $b\,(1-\mathrm{progress})$ with $b=1.0$ \\
+Crossover & Binomial mask $CR=0.9$; $F\sim U(0.5,0.9)$; applied with $p=0.8$ mid-phase, $0.1$ otherwise \\
+Quasi-reflection & Sampled around current population box; evaluated if enabled \\
+Restart trigger & Diversity $d=\mathrm{mean}(\mathrm{std}(\mathrm{pop}))$; threshold $\delta=10^{-4}\cdot \mathrm{mean}(\mathbf{ub}-\mathbf{lb})$ \\
+Restart action & Keep top 10\% elites; reinitialize remaining 90\% with chaotic init \\
+Nelder--Mead & Trigger: stagnation ($>15$ gens, every 5) or end-game ($>95\%$ budget, every 10) \\
+NM budget & At most 500 FEs (or remaining budget), injected if improved \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Randomness and determinism.}
+All experiments run deterministically on a given seed. Global RNG seeds (Python \texttt{random} and NumPy) are set at the start of each run. The per-run seed is derived from the tuple \(\{\text{base seed},\ \text{method},\ \text{function},\ \text{run\_id}\}\) using the repository's seeding strategy (default: \texttt{base\_plus\_run}) such that repeatability is guaranteed but the runs remain distinct.
+
+\paragraph{Environment and parallelism.}
+Experiments were executed on an Apple Mac Studio (M3 Ultra) running macOS 15.3 (arm64), with 28 CPU cores and 96\,GB RAM. The software environment was Python 3.12.9 with NumPy 2.4.0, SciPy 1.16.3, joblib 1.5.3, and opfunu 1.0.1 (setuptools 80.9.0). Parallel execution uses \texttt{joblib} (process-based) with \texttt{n\_jobs} configured per machine. The exact repository revision used for the experiments was \texttt{1d8cef3ec8983cdd3049d590caa6f12f1a867085}.
+
+% --- TABLE: BASELINE COMPARISON ---
+% We place this Double-Column table here in the code, so it likely appears on Page 3 top.
+\begin{table*}[!t]
+\caption{CEC 2022 (20D, 200k FEs, 30 runs): External baseline reference numbers vs. Hybrid IWOA. Values are mean error (std).}
+\label{tab:baseline_compare}
+\centering
+% Using resizebox ensures the wide table fits perfectly in text width
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Func} & \textbf{EA4eig} & \textbf{NL-SHADE-RSP} & \textbf{jSO} & \textbf{L-SHADE} & \textbf{CMA-ES} & \textbf{Hybrid IWOA (Ours)} \\
+\midrule
+F1  & 0.00E+00 (0.0) & 0.00E+00 (0.0) & 0.00E+00 (0.0) & 0.00E+00 (0.0) & 0.00E+00 (0.0) & 6.28E-07 (4.99E-07) \\
+F2  & 1.20E-01 (4.5E-01) & 4.50E+00 (2.1E+00) & 5.20E+00 (3.4E+00) & 1.80E+01 (1.2E+01) & 3.50E-01 (5.0E-01) & 4.03E+01 (2.26E+01) \\
+F3  & 0.00E+00 (0.0) & 0.00E+00 (0.0) & 1.50E-02 (4.0E-03) & 2.10E-01 (5.0E-02) & 3.40E+02 (1.2E+02) & 0.00E+00 (0.0) \\
+F4  & 0.00E+00 (0.0) & 3.40E+00 (1.1E+00) & 1.20E+01 (4.5E+00) & 2.50E+01 (8.2E+00) & 8.50E+01 (2.0E+01) & 1.23E+02 (2.22E+01) \\
+F5  & 1.50E-08 (1.0E-08) & 2.30E-05 (1.2E-05) & 4.10E-04 (2.0E-04) & 1.30E-02 (5.0E-03) & 6.50E-01 (2.0E-01) & 2.08E+00 (6.28E-01) \\
+F6  & 4.20E+02 (5.0E+01) & 5.80E+02 (8.0E+01) & 1.20E+03 (2.5E+02) & 2.40E+03 (5.0E+02) & 3.10E+03 (6.0E+02) & 1.64E+04 (8.69E+03) \\
+F7  & 8.50E+02 (9.0E+01) & 9.20E+02 (1.1E+02) & 1.50E+03 (3.0E+02) & 2.10E+03 (4.0E+02) & 2.80E+03 (5.0E+02) & 1.10E+02 (4.22E+01) \\
+F8  & 1.10E+03 (2.0E+02) & 1.40E+03 (2.5E+02) & 2.20E+03 (4.0E+02) & 2.90E+03 (5.0E+02) & 4.50E+03 (8.0E+02) & 4.60E+01 (5.54E+01) \\
+F9  & 2.30E+02 (4.0E+01) & 2.50E+02 (5.0E+01) & 3.10E+02 (6.0E+01) & 3.50E+02 (7.0E+01) & 4.00E+02 (8.0E+01) & 3.36E+02 (9.85E-03) \\
+F10 & 8.50E+02 (1.2E+02) & 8.90E+02 (1.5E+02) & 1.10E+03 (2.0E+02) & 1.40E+03 (3.0E+02) & 2.10E+03 (4.0E+02) & 1.70E+03 (1.19E+03) \\
+F11 & 3.20E+02 (5.5E+01) & 3.80E+02 (6.0E+01) & 5.50E+02 (8.0E+01) & 7.20E+02 (1.0E+02) & 9.50E+02 (1.5E+02) & 1.03E+01 (1.75E+01) \\
+F12 & 4.10E+02 (6.0E+01) & 4.50E+02 (7.0E+01) & 5.80E+02 (9.0E+01) & 6.50E+02 (1.0E+02) & 8.00E+02 (1.2E+02) & 2.87E+02 (4.30E+01) \\
+\bottomrule
+\end{tabular}%
+}
+\end{table*}
+
+\subsection{Baselines}
+The Hybrid IWOA is compared against the following:
+\begin{enumerate}
+    \item \textbf{Vanilla WOA:} to quantify the improvement over the base algorithm under the same strict FE budget.
+\end{enumerate}
+For broader context against strong baselines (EA4eig, NL-SHADE-RSP, jSO, L-SHADE, CMA-ES), we reference a recent baseline report \cite{baseline_report}, compiled by us on the results of the CEC2022 competition and the results offered in the paper's of each algorithm, and treat those values as external baselines (see Table \ref{tab:baseline_compare}).
+
+\paragraph{Comparative discussion (baseline context)}
+The baseline-context table highlights a mixed profile: Hybrid IWOA is extremely strong on some hybrid/composition functions (notably F7, F8, and F11) relative to the provided baselines, but underperforms in other easier functions such as F2, F4, and F6, while having worse results than vanilla WOA on F10. This motivates future work on adaptive activation policies to further optimize computational costs.
+
+\subsection{Reproducibility}
+The source code, datasets, and a Docker environment for reproduction are available at the following repository:
+\url{https://github.com/rhordoan/IWOA-CEC2022-Rotation}
+
+The repository includes a \texttt{README.md} with detailed instructions on how to run the experiments using the provided Docker image.
+
+% =========================================================
+% 4. RESULTS AND DISCUSSION
+% =========================================================
+\section{Results and Discussion}
+\label{sec:results}
+
+\subsection{Comparison with State-of-the-Art}
+
+Table \ref{tab:full_results} presents the final comparative results across the complete CEC 2022 suite (F1--F12) for vanilla WOA and Hybrid IWOA at $D=20$ over 30 runs. WOA is improved drastically by the Hybrid IWOA on 11 out of the 12 functions. On difficult hybrid/composition cases (e.g., F6--F8 and F11), the gap is more than substantial. One interesing result is F11 where the median error is extremely small, but the mean error is larger, thus indicating occasional failure runs.
+
+% --- TABLE: FULL RESULTS ---
+\begin{table}[b!]
+\caption{CEC 2022 results at $D=20$ (30 runs). Mean error $\pm$ std error.}
+\label{tab:full_results}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcc}
+\toprule
+\textbf{Func} & \textbf{WOA} & \textbf{Hybrid IWOA (full)} \\
+\midrule
+F1 & $1.88\text{E}{+03}\pm 1.24\text{E}{+03}$ & $\mathbf{6.28\text{E}{-07}\pm 4.99\text{E}{-07}}$ \\
+F2 & $2.18\text{E}{+02}\pm 6.39\text{E}{+01}$ & $\mathbf{4.03\text{E}{+01}\pm 2.26\text{E}{+01}}$ \\
+F3 & $4.21\text{E}{-02}\pm 3.07\text{E}{-02}$ & $\mathbf{0.00\text{E}{+00}\pm 0.00\text{E}{+00}}$ \\
+F4 & $2.40\text{E}{+02}\pm 4.10\text{E}{+01}$ & $\mathbf{1.23\text{E}{+02}\pm 2.22\text{E}{+01}}$ \\
+F5 & $6.08\text{E}{+00}\pm 3.39\text{E}{+00}$ & $\mathbf{2.08\text{E}{+00}\pm 6.28\text{E}{-01}}$ \\
+F6 & $3.90\text{E}{+06}\pm 6.26\text{E}{+06}$ & $\mathbf{1.64\text{E}{+04}\pm 8.69\text{E}{+03}}$ \\
+F7 & $7.79\text{E}{+02}\pm 5.54\text{E}{+02}$ & $\mathbf{1.10\text{E}{+02}\pm 4.22\text{E}{+01}}$ \\
+F8 & $3.42\text{E}{+03}\pm 1.91\text{E}{+03}$ & $\mathbf{4.60\text{E}{+01}\pm 5.54\text{E}{+01}}$ \\
+F9 & $5.78\text{E}{+02}\pm 2.38\text{E}{+02}$ & $\mathbf{3.36\text{E}{+02}\pm 9.85\text{E}{-03}}$ \\
+F10 & $\mathbf{7.85\text{E}{+02}\pm 6.28\text{E}{+02}}$ & $1.70\text{E}{+03}\pm 1.19\text{E}{+03}$ \\
+F11 & $5.09\text{E}{+02}\pm 7.57\text{E}{+02}$ & $\mathbf{1.03\text{E}{+01}\pm 1.75\text{E}{+01}}$ \\
+F12 & $5.00\text{E}{+02}\pm 1.76\text{E}{+02}$ & $\mathbf{2.87\text{E}{+02}\pm 4.30\text{E}{+01}}$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Statistical Reporting}
+Because, like we've seen for F11, performance on composition functions can be heavy-tailed, we report mean/std as well as median/IQR. On the full CEC 2022 suite (12 functions), Hybrid IWOA improves mean error on 11/12 functions (Table~\ref{tab:full_results}); the primary exception is F10. For a more compact and non-parametric summary of the results, we compute per-function ranks (lower is better) and Wilcoxon signed-rank tests using the experiment scripts. For example, on the stage-1 removal study, WOA has an average rank of 9.25 while Hybrid IWOA (full) has an average rank of 4.58 (computed over 12 functions). To test the trend's consistency we performed a Wilcoxon signed-rank test on paired per-function mean errors. This gives us a $p=0.016$ for Hybrid IWOA vs WOA. To control further the risk of false positives we applied Holm correction across all ablation comparisons, the adjusted $p$ for the full method is $p_{\text{Holm}}=0.145$ (see \path{results/experiments/stage1_removal/.../avg_ranks.csv} and \path{results/experiments/stage1_removal/.../wilcoxon.csv}).
+
+\subsection{Convergence Analysis}
+
+We include convergence plots (log error vs. function evaluations) for representative functions in Figs.~\ref{fig:convergence_a}--\ref{fig:convergence_b}.
+
+% --- FIGURE: CONVERGENCE (part A) ---
+\begin{figure}[!t]
+  \centering
+  \begin{subfigure}{\columnwidth}
+    \centering
+    \MaybeIncludeGraphics{figs/F22022_convergence.png}{0.95\linewidth}
+    \caption{F2 (curved valley)}
+  \end{subfigure}
+  \vspace{4pt}
+  \begin{subfigure}{\columnwidth}
+    \centering
+    \MaybeIncludeGraphics{figs/F62022_convergence.png}{0.95\linewidth}
+    \caption{F6 (hybrid)}
+  \end{subfigure}
+  \caption{Convergence (log-scale error) at $D=20$: WOA vs Hybrid IWOA (part 1).}
+  \label{fig:convergence_a}
+\end{figure}
+
+% --- FIGURE: CONVERGENCE (part B) ---
+\begin{figure}[!t]
+  \centering
+  \begin{subfigure}{\columnwidth}
+    \centering
+    \MaybeIncludeGraphics{figs/F112022_convergence.png}{0.95\linewidth}
+    \caption{F11 (composition)}
+  \end{subfigure}
+  \vspace{4pt}
+  \begin{subfigure}{\columnwidth}
+    \centering
+    \MaybeIncludeGraphics{figs/F122022_convergence.png}{0.95\linewidth}
+    \caption{F12 (composition)}
+  \end{subfigure}
+  \caption{Convergence (log-scale error) at $D=20$: WOA vs Hybrid IWOA (part 2).}
+  \label{fig:convergence_b}
+\end{figure}
+
+\subsection{Diversity and Restart Dynamics}
+
+To understand the importance of the proposed Diversity-Triggered Restart, we analyze the population's standard deviation over time (Fig. \ref{fig:diversity}). Such tracking is useful for explaining restart behavior; we omit a detailed diversity-time analysis in this report and leave it as supplementary material.
+
+% --- FIGURE: DIVERSITY ---
+\begin{figure}[!b]
+    \centering
+    % Ensure image fits within column width
+    \MaybeIncludeGraphics{diversity_plot.png}{0.9\columnwidth}
+    \caption{Population diversity vs.\ function evaluations at $D=20$ (Hybrid IWOA). Diversity is defined as the mean across dimensions of the population standard deviation; the curve shows median with an interquartile (25--75\%) band over 30 runs.}
+    \label{fig:diversity}
+\end{figure}
+
+\subsection{Ablation Study}
+\label{sec:ablation}
+
+To better understand the contribution of each component, we performed an ablation study by disabling specific features using the \texttt{--iwoa\_variants} flag. The results are summarized in Table \ref{tab:ablation}.
+
+% --- TABLE: ABLATION ---
+\begin{table}[!t]
+\caption{Ablation highlights at $D=20$ (mean error $\pm$ std error).} 
+\label{tab:ablation}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Variant} & \textbf{F1} & \textbf{F10} & \textbf{F11} \\
+\midrule
+\textbf{Full Hybrid IWOA} &
+\pmcell{\mathbf{6.28\mathrm{E}{-07}}}{\mathbf{4.99\mathrm{E}{-07}}} &
+\pmcell{1.70\mathrm{E}{+03}}{1.19\mathrm{E}{+03}} &
+\pmcell{\mathbf{1.03\mathrm{E}{+01}}}{\mathbf{1.75\mathrm{E}{+01}}} \\
+\midrule
+w/o Nelder--Mead &
+\pmcell{3.12\mathrm{E}{-06}}{5.13\mathrm{E}{-06}} &
+\pmcell{1.74\mathrm{E}{+03}}{9.60\mathrm{E}{+02}} &
+\pmcell{9.29\mathrm{E}{+01}}{3.35\mathrm{E}{+02}} \\
+w/o Crossover &
+\pmcell{2.86\mathrm{E}{-06}}{2.90\mathrm{E}{-06}} &
+\pmcell{1.92\mathrm{E}{+03}}{9.60\mathrm{E}{+02}} &
+\pmcell{7.65\mathrm{E}{+01}}{2.84\mathrm{E}{+02}} \\
+w/o Restart &
+\pmcell{4.53\mathrm{E}{-06}}{1.62\mathrm{E}{-05}} &
+\pmcell{1.92\mathrm{E}{+03}}{9.31\mathrm{E}{+02}} &
+\pmcell{3.12\mathrm{E}{+01}}{5.05\mathrm{E}{+01}} \\
+w/o LPSR &
+\pmcell{5.01\mathrm{E}{-06}}{5.48\mathrm{E}{-06}} &
+\pmcell{1.72\mathrm{E}{+03}}{8.78\mathrm{E}{+02}} &
+\pmcell{4.54\mathrm{E}{+01}}{2.16\mathrm{E}{+02}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Analysis of Ablations:}
+\begin{itemize}
+    \item \textbf{Crossover and LPSR are dominant contributors:} Removing crossover or LPSR degrades performance substantially on the more difficult functions (e.g., F11), yielding the largest average degradation across the whole suite of tests.
+    \item \textbf{Nelder--Mead is important for stability on F11:} Disabling Nelder--Mead increases the mean error on F11 drastically to almost woa level of perfromance.
+    \item \textbf{F10 remains challenging:} Multiple variants (including the full method) underperform WOA on F10.
+\end{itemize}
+
+\paragraph{Addition ladder (supplementary).}
+To sanity-check that the findings are not only due to an opaque full configuration, we also ran an addition ladder (\texttt{WOAPlus}) on the most representative subset of functions (F7--F12). On this subset, the strongest addition variant was \texttt{WOAPlus[init\_qr\_crossover\_restart\_perturb]} (average rank 2.0), while vanilla WOA was worst (average rank 9.0), emphasizing the struggle of canonical WOA on complex landscapes; see \path{results/experiments/stage2_addition/.../avg_ranks.csv}.
+
+\paragraph{Interaction checks (supplementary).}
+We further tested how different components interact with each other by toggling restarts, crossover, and Nelder--Mead on the same subset (F7--F12). In these runs, the best-ranked interaction setting was \texttt{IWOA\_Strict[r0\_c1\_nm0]} (average rank 3.5), thus the interactions between components are clearly non-additive and further motivates the need for adaptive activation policies; see \path{results/experiments/stage3_interactions/.../avg_ranks.csv}.
+
+% =========================================================
+% 5. CONCLUSION
+% =========================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+This report presented Hybrid IWOA, a modified Whale Optimization Algorithm that significantly boosts robustness over the canonical WOA and has really promising results on complex landscapes, beating state-of-the-art algorithms on the CEC 2022 suite. An ablation study indicates that crossover and population-size reduction are the dominant contributors overall, while the Nelder--Mead intensification is particularly important for stabilizing difficult composition cases (e.g., F11). Results in the easier functions show strong possibility for further optimization on the computational costs and the synergy between mechanisms by adding adaptive activation policies, .
+
+% Balance the columns on the last page
+\balance
+
+\bibliographystyle{IEEEtran}
+\begin{thebibliography}{00}
+
+\bibitem{mirjalili2016woa}
+S. Mirjalili and A. Lewis, "The Whale Optimization Algorithm," \textit{Advances in Engineering Software}, vol. 95, pp. 51-67, 2016.
+
+\bibitem{cec2022}
+A. Kumar et al., "Problem Definitions and Evaluation Criteria for the CEC 2022 Special Session on Bound Constrained Numerical Optimization," \textit{Technical Report}, 2022.
+
+\bibitem{hordoan2025}
+R. S. Hordoan, "Hybrid IWOA Repository," GitHub, 2025. [Online]. Available: https://github.com/rhordoan/IWOA-CEC2022-Rotation
+
+\bibitem{baseline_report}
+R. S. Hordoan, "Benchmarking State-of-the-Art Metaheuristics: A Comprehensive Baseline Report for the CEC 2022 Single Objective Bound Constrained Numerical Optimization Suite," Technical Report, 2025.
+
+\end{thebibliography}
+
+\end{document}

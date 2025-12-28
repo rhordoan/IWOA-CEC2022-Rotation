@@ -1,0 +1,10 @@
+baseline,method,n_functions,wilcoxon_stat,p_value,p_holm
+WOA,WOAPlus[init],6,0.0,0.03125,0.28125
+WOA,WOAPlus[init_qr_crossover],6,0.0,0.03125,0.28125
+WOA,WOAPlus[init_qr_crossover_restart_perturb],6,0.0,0.03125,0.28125
+WOA,WOAPlus[init_qr_crossover_restart],6,1.0,0.0625,0.375
+WOA,WOAPlus[init_qr_crossover_restart_perturb_chaos],6,1.0,0.0625,0.375
+WOA,WOAPlus[all],6,3.0,0.15625,0.625
+WOA,WOAPlus[init_qr_crossover_restart_perturb_chaos_nm],6,3.0,0.15625,0.625
+WOA,WOAPlus[init_qr],6,5.0,0.3125,0.625
+WOA,IWOA_Strict[full],6,5.0,0.3125,0.625

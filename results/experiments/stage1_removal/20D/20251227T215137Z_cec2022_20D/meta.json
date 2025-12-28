@@ -1,0 +1,56 @@
+{
+  "config": {
+    "dims": 20,
+    "functions": [
+      "F12022",
+      "F22022",
+      "F32022",
+      "F42022",
+      "F52022",
+      "F62022",
+      "F72022",
+      "F82022",
+      "F92022",
+      "F102022",
+      "F112022",
+      "F122022"
+    ],
+    "iwoa_variants": [
+      "full"
+    ],
+    "max_fes": 200000,
+    "methods": [
+      "woa",
+      "iwoa",
+      "iwoa:no_init",
+      "iwoa:no_qr",
+      "iwoa:no_lpsr",
+      "iwoa:no_restart",
+      "iwoa:no_crossover",
+      "iwoa:no_levy",
+      "iwoa:no_chaos",
+      "iwoa:no_nelder_mead"
+    ],
+    "min_pop_size": 20,
+    "n_jobs": 24,
+    "pop_size": 100,
+    "runs": 30,
+    "seed": 12345,
+    "seed_strategy": "base_plus_run"
+  },
+  "env": {
+    "executable": "/Users/computacenterro/Documents/IWOA-CEC2022-Rotation/venv/bin/python3",
+    "packages": {
+      "joblib": "1.5.3",
+      "matplotlib": "3.10.8",
+      "numpy": "2.4.0",
+      "opfunu": "1.0.1",
+      "pandas": "2.3.3",
+      "scipy": "1.16.3",
+      "tabulate": "0.9.0"
+    },
+    "platform": "macOS-15.3-arm64-arm-64bit",
+    "python": "3.12.9 (v3.12.9:fdb81425a9a, Feb  4 2025, 12:21:36) [Clang 13.0.0 (clang-1300.0.29.30)]",
+    "utc_time": "2025-12-27T22:38:01.922239+00:00"
+  }
+}

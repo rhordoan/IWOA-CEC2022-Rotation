@@ -1,2 +1,0 @@
-method,function,dims,max_fes,runs,mean_error,std_error,median_error,iqr_error,best_error,worst_error
-IWOA_Strict,F12022,2,200,2,231.2900716420641,29.17449680028618,231.2900716420641,20.629484525187593,210.6605871168765,251.9195561672517

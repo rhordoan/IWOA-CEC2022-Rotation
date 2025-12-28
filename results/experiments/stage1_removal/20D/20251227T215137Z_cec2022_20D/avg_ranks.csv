@@ -1,0 +1,11 @@
+method,avg_rank
+IWOA_Strict[no_chaos],4.166666666666667
+IWOA_Strict[no_init],4.25
+IWOA_Strict[no_qr],4.416666666666667
+IWOA_Strict[full],4.583333333333333
+IWOA_Strict[no_nelder_mead],5.25
+IWOA_Strict[no_levy],5.333333333333333
+IWOA_Strict[no_lpsr],5.75
+IWOA_Strict[no_restart],5.833333333333333
+IWOA_Strict[no_crossover],6.166666666666667
+WOA,9.25

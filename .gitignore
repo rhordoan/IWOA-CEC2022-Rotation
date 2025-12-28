@@ -201,6 +201,27 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Experiment artifacts (keep summaries/plots, ignore large per-run logs)
+results/experiments/**/results.csv
+results/experiments/**/results.jsonl
+results/experiments/**/*.tar.gz
+results/logs/
+results/convergence/**
+
+# LaTeX build artifacts (keep sources/figures only)
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.log
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex*
+report/*.out
+report/*.toc
+report/*.pdf
+
+# Local convenience outputs (repo root only)
+/diversity_plot.png
 # Marimo
 marimo/_static/
 marimo/_lsp/

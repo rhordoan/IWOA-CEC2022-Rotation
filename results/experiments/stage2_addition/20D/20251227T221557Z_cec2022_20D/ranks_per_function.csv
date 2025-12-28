@@ -1,0 +1,7 @@
+function,IWOA_Strict[full],WOA,WOAPlus[all],WOAPlus[init],WOAPlus[init_qr],WOAPlus[init_qr_crossover],WOAPlus[init_qr_crossover_restart],WOAPlus[init_qr_crossover_restart_perturb],WOAPlus[init_qr_crossover_restart_perturb_chaos],WOAPlus[init_qr_crossover_restart_perturb_chaos_nm]
+F102022,10.0,4.0,8.0,3.0,9.0,2.0,5.0,1.0,6.0,7.0
+F112022,6.0,10.0,1.0,9.0,8.0,7.0,5.0,4.0,3.0,2.0
+F122022,7.0,10.0,2.0,9.0,8.0,4.0,3.0,1.0,5.0,6.0
+F72022,8.0,10.0,5.0,9.0,1.0,6.0,3.0,4.0,2.0,7.0
+F82022,5.0,10.0,2.0,9.0,8.0,6.0,7.0,1.0,3.0,4.0
+F92022,2.0,10.0,3.0,9.0,8.0,7.0,5.0,1.0,6.0,4.0

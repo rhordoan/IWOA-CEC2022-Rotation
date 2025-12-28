@@ -170,10 +170,10 @@ class EvaluatorWithHistory:
         if self.calls >= self.max_fes:
             self.stop_flag = True
             return 1e15
-
+        
         val = self.func(np.clip(x, self.lb, self.ub))
         self.calls += 1
-
+        
         err = abs(float(val) - self.optimal)
         if err == 0.0:
             err = 1e-15
@@ -183,7 +183,7 @@ class EvaluatorWithHistory:
         if self.calls in self._checkpoints_set:
             self.history_fes.append(int(self.calls))
             self.history_error.append(float(self._best_error))
-
+            
         return val
 
     def __call__(self, x):
@@ -209,7 +209,7 @@ def _run_single(cfg: ConvergenceConfig, method: str, func_name: str, run_id: int
 
     seed = _make_run_seed(cfg, method=method, func_name=func_name, run_id=run_id)
     _set_global_seeds(seed)
-
+    
     problem = getattr(cec2022_local, func_name)(ndim=cfg.dims)
     bounds = np.array([problem.lb, problem.ub])
     checkpoints = _make_checkpoints(cfg.max_fes, cfg.log_every)
@@ -283,7 +283,7 @@ def _plot_function(out_dir: str, func_name: str, agg: pd.DataFrame) -> str:
     plt.ylabel("Error (log scale)", fontsize=12)
     plt.grid(True, which="both", ls="-", alpha=0.5)
     plt.legend(fontsize=10)
-
+    
     out_file = os.path.join(fig_dir, f"{func_name}_convergence.png")
     plt.savefig(out_file, dpi=300, bbox_inches="tight")
     plt.close()

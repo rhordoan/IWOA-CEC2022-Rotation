@@ -1,0 +1,9 @@
+baseline,method,n_functions,wilcoxon_stat,p_value,p_holm
+WOA,IWOA_Strict[r0_c0_nm1],6,4.0,0.21875,1.0
+WOA,IWOA_Strict[full],6,5.0,0.3125,1.0
+WOA,IWOA_Strict[r0_c0_nm0],6,5.0,0.3125,1.0
+WOA,IWOA_Strict[r0_c1_nm0],6,5.0,0.3125,1.0
+WOA,IWOA_Strict[r0_c1_nm1],6,5.0,0.3125,1.0
+WOA,IWOA_Strict[r1_c0_nm0],6,5.0,0.3125,1.0
+WOA,IWOA_Strict[r1_c0_nm1],6,5.0,0.3125,1.0
+WOA,IWOA_Strict[r1_c1_nm0],6,5.0,0.3125,1.0

@@ -1,0 +1,10 @@
+method,avg_rank
+IWOA_Strict[r0_c1_nm0],3.5
+IWOA_Strict[r0_c1_nm1],3.6666666666666665
+IWOA_Strict[r1_c1_nm0],3.6666666666666665
+IWOA_Strict[full],4.0
+IWOA_Strict[r0_c0_nm1],4.5
+IWOA_Strict[r1_c0_nm0],5.166666666666667
+IWOA_Strict[r1_c0_nm1],5.833333333333333
+IWOA_Strict[r0_c0_nm0],7.0
+WOA,7.666666666666667
